@@ -1,0 +1,7 @@
+[package]
+name = "havlak"
+version = "0.1.0"
+authors = ["Marcell Pardavi <marcell.pardavi@gmail.com>"]
+
+[dependencies]
+typed-arena = "1.1.0"
