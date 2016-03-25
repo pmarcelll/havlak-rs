@@ -127,7 +127,7 @@ impl<'a> CFG<'a> {
     }
 
     fn get_start_basic_block(&self) -> Option<&'a BBRef<'a>> {
-        self.start_node.clone()
+        self.start_node
     }
 
     fn get_basic_blocks(&self) -> &BTreeMap<i32, &'a BBRef<'a>> {
@@ -258,7 +258,7 @@ impl<'a, 'b, 'c> UnionFindNode<'a, 'b, 'c> {
             this = x;
         }
 
-        for e in nodelist.iter() {
+        for e in &nodelist {
             let p = this.borrow().parent;
             e.borrow_mut().set_parent(p);
         }
@@ -316,13 +316,13 @@ impl<'a, 'b, 'c> HavlakLoopFinder<'a, 'b, 'c>  {
            current: i32) -> i32 {
 
         nodes[current as usize].borrow_mut().init(current_node, current);
-        number.insert(current_node.clone(), current);
+        number.insert(current_node, current);
 
         let mut last_id = current;
-        let curr = current_node.clone();
-        for target in curr.borrow().out_edges.iter() {
+        let curr = current_node;
+        for target in &curr.borrow().out_edges {
             if *number.get(target).unwrap() == K_UNVISITED {
-                last_id = Self::dfs(target.clone(), nodes, number, last, last_id + 1);
+                last_id = Self::dfs(target, nodes, number, last, last_id + 1);
             }
         }
         last[number[&current_node] as usize] = last_id;
@@ -347,7 +347,7 @@ impl<'a, 'b, 'c> HavlakLoopFinder<'a, 'b, 'c>  {
         }
 
         for b in self.cfg.get_basic_blocks() {
-            number.insert(b.1.clone(), K_UNVISITED);
+            number.insert(b.1, K_UNVISITED);
         }
 
         Self::dfs(self.cfg.get_start_basic_block().unwrap(), &mut nodes, &mut number, &mut last, 0);
@@ -357,7 +357,7 @@ impl<'a, 'b, 'c> HavlakLoopFinder<'a, 'b, 'c>  {
             let nb = nodes[w].borrow();
             let node_w = nb.get_bb();
             if let Some(x) = node_w {
-                for node_v in x.borrow().in_edges.iter() {
+                for node_v in &x.borrow().in_edges {
                     let v = number[node_v];
                     if v == K_UNVISITED { continue; }
 
@@ -377,19 +377,19 @@ impl<'a, 'b, 'c> HavlakLoopFinder<'a, 'b, 'c>  {
         for w in (0..size).rev() {
             let mut node_pool: Vec<&UFRef> = vec![];
 
-            if nodes[w].borrow_mut().get_bb().is_some() {
-                for v in back_preds[w].iter() {
-                    if *v != w as i32 {
-                        node_pool.push(UnionFindNode::find_set(nodes[*v as usize]));
-                    } else {
-                        btype[w] = BasicBlockClass::IsSelf;
-                    }
-                }
-            } else {
+            if nodes[w].borrow_mut().get_bb().is_none() {
                 continue;
             }
 
-            let mut worklist: Vec<&UFRef> = node_pool.iter().rev().map(|x| x.clone()).collect();
+            for v in &back_preds[w] {
+                if *v == w as i32 {
+                    btype[w] = BasicBlockClass::IsSelf;
+                } else {
+                    node_pool.push(UnionFindNode::find_set(nodes[*v as usize]));
+                }
+            }
+
+            let mut worklist: Vec<&UFRef> = node_pool.iter().rev().cloned().collect();
 
             if !node_pool.is_empty() {
                 btype[w] = BasicBlockClass::Reducible;
@@ -406,14 +406,14 @@ impl<'a, 'b, 'c> HavlakLoopFinder<'a, 'b, 'c>  {
                     let ydash = UnionFindNode::find_set(nodes[*y as usize]);
 
                     let num = ydash.borrow().dfs_number;
-                    if !Self::is_ancestor(w as i32, num, &last) {
-                        btype[w] = BasicBlockClass::Irreducible;
-                        non_back_preds[w].borrow_mut().insert(num);
-                    } else {
+                    if Self::is_ancestor(w as i32, num, &last) {
                         if num != w as i32 && !node_pool.contains(&ydash) {
                             worklist.push(ydash);
                             node_pool.push(ydash);
                         }
+                    } else {
+                        btype[w] = BasicBlockClass::Irreducible;
+                        non_back_preds[w].borrow_mut().insert(num);
                     }
                 }
             }
